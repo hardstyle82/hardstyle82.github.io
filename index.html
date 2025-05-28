@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рулетка - Зарабатывай звёзды!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Рулетка с призами</h1>
+            <p>Крутите рулетку и выигрывайте звёзды и премиум Telegram!</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="wheel-section">
+                <div class="wheel-container">
+                    <div class="wheel-pointer"></div>
+                    <div class="wheel" id="wheel"></div>
+                    <div class="wheel-center"></div>
+                </div>
+                
+                <div class="subscribe-check">
+                    <input type="checkbox" id="subscribe-check">
+                    <label for="subscribe-check">Я подписался на <a href="https://t.me/zarabotay_depin" target="_blank">канал</a></label>
+                </div>
+                
+                <button class="spin-btn" id="spin-btn" disabled>Крутить рулетку</button>
+                
+                <div class="bonus-section">
+                    <h3 class="bonus-title">Бонусы</h3>
+                    <button class="daily-bonus-btn" id="daily-bonus-btn">Получить ежедневный бонус (10 звёзд)</button>
+                    
+                    <div class="ref-section">
+                        <button class="ref-btn" id="ref-btn">Получить реферальную ссылку</button>
+                        <div class="ref-link-container" id="ref-link-container" style="display: none;">
+                            <input type="text" class="ref-link" id="ref-link" readonly>
+                            <button class="copy-btn" id="copy-btn">Копировать</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="winners-section">
+                <h2 class="winners-title">Последние победители</h2>
+                <ul class="winners-list" id="winners-list"></ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="progress-container">
+        <div class="progress-label">Ваши звёзды</div>
+        <div class="progress-bar" id="progress-bar">0/555</div>
+    </div>
+    
+    <a href="https://www.youtube.com/@madnessgames_?sub_confirmation=1" class="stars-btn" id="stars-btn" disabled>Получить звёзды</a>
+    
+    <div class="notification" id="notification"></div>
+    
+    <script>
+        const config = {
+            wheelItems: [
+                { text: "10 звёзд", color: "#FF5252", value: 10 },
+                { text: "20 звёзд", color: "#FF8C00", value: 20 },
+                { text: "5 звёзд", color: "#FFD700", value: 5 },
+                { text: "50 звёзд", color: "#4CAF50", value: 50 },
+                { text: "Премиум Telegram", color: "#1E90FF", value: "premium" },
+                { text: "15 звёзд", color: "#8A2BE2", value: 15 },
+                { text: "30 звёзд", color: "#FF1493", value: 30 },
+                { text: "100 звёзд", color: "#00CED1", value: 100 }
+            ],
+            minSpinDelay: 2000,
+            maxSpinDelay: 6000,
+            dailyBonus: 10,
+            starsRequired: 555
+        };
+        
+        const state = {
+            stars: 0,
+            lastSpin: null,
+            dailyBonusClaimed: false,
+            subscribed: false,
+            winners: []
+        };
+        
+        const elements = {
+            wheel: document.getElementById('wheel'),
+            spinBtn: document.getElementById('spin-btn'),
+            subscribeCheck: document.getElementById('subscribe-check'),
+            progressBar: document.getElementById('progress-bar'),
+            starsBtn: document.getElementById('stars-btn'),
+            winnersList: document.getElementById('winners-list'),
+            dailyBonusBtn: document.getElementById('daily-bonus-btn'),
+            refBtn: document.getElementById('ref-btn'),
+            refLinkContainer: document.getElementById('ref-link-container'),
+            refLink: document.getElementById('ref-link'),
+            copyBtn: document.getElementById('copy-btn'),
+            notification: document.getElementById('notification')
+        };
+        
+        function initWheel() {
+            const wheel = elements.wheel;
+            wheel.innerHTML = '';
+            
+            const itemAngle = 360 / config.wheelItems.length;
+            
+            config.wheelItems.forEach((item, index) => {
+                const wheelItem = document.createElement('div');
+                wheelItem.className = 'wheel-item';
+                wheelItem.textContent = item.text;
+                wheelItem.style.transform = `rotate(${index * itemAngle}deg)`;
+                wheelItem.style.backgroundColor = item.color;
+                wheel.appendChild(wheelItem);
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = item.text;
+                textSpan.style.transform = `rotate(${itemAngle / 2}deg)`;
+                textSpan.style.display = 'inline-block';
+                textSpan.style.width = '80px';
+                textSpan.style.textAlign = 'center';
+                wheelItem.innerHTML = '';
+                wheelItem.appendChild(textSpan);
+            });
+        }
+        
+        function spinWheel() {
+            if (elements.spinBtn.disabled) return;
+            
+            elements.spinBtn.disabled = true;
+            elements.wheel.classList.add('wheel-spinning');
+            
+            const randomIndex = Math.floor(Math.random() * config.wheelItems.length);
+            const itemAngle = 360 / config.wheelItems.length;
+            const targetAngle = 360 * 5 + (360 - (randomIndex * itemAngle + itemAngle / 2));
+            
+            elements.wheel.style.transform = `rotate(${targetAngle}deg)`;
+            
+            setTimeout(() => {
+                elements.wheel.classList.remove('wheel-spinning');
+                const prize = config.wheelItems[randomIndex];
+                handlePrize(prize);
+                
+                setTimeout(() => {
+                    if (elements.subscribeCheck.checked) {
+                        elements.spinBtn.disabled = false;
+                    }
+                }, 3000);
+            }, 4000);
+        }
+        
+        function handlePrize(prize) {
+            let message = '';
+            
+            if (prize.value === "premium") {
+                message = `Поздравляем! Вы выиграли ${prize.text}`;
+            } else {
+                state.stars += prize.value;
+                updateStars();
+                message = `Поздравляем! Вы выиграли ${prize.text}`;
+                addWinner(`Игрок ${generateRandomName()}`, prize.text);
+            }
+            
+            showNotification(message);
+            createConfetti();
+        }
+        
+        function updateStars() {
+            elements.progressBar.textContent = `${state.stars}/${config.starsRequired}`;
+            elements.progressBar.style.width = `${Math.min(100, (state.stars / config.starsRequired) * 100)}%`;
+            
+            if (state.stars >= config.starsRequired) {
+                elements.starsBtn.disabled = false;
+            }
+        }
+        
+        function addWinner(name, prize) {
+            const now = new Date();
+            const time = now.toLocaleTimeString();
+            
+            state.winners.unshift({
+                name: name,
+                prize: prize,
+                time: time
+            });
+            
+            if (state.winners.length > 25) {
+                state.winners.pop();
+            }
+            
+            updateWinnersList();
+        }
+        
+        function updateWinnersList() {
+            elements.winnersList.innerHTML = '';
+            
+            state.winners.forEach(winner => {
+                const li = document.createElement('li');
+                li.className = 'winner-item';
+                li.innerHTML = `
+                    <span class="winner-name">${winner.name}</span>
+                    <span class="winner-prize">${winner.prize}</span>
+                    <span class="winner-time">${winner.time}</span>
+                `;
+                elements.winnersList.appendChild(li);
+            });
+        }
+        
+        function generateRandomName() {
+            const names = ['Алексей', 'Мария', 'Иван', 'Елена', 'Дмитрий', 'Ольга', 'Сергей', 'Анна', 'Андрей', 'Наталья'];
+            const surnames = ['Иванов', 'Петрова', 'Сидоров', 'Смирнова', 'Кузнецов', 'Васильева', 'Попов', 'Новикова', 'Соколов', 'Морозова'];
+            
+            return `${names[Math.floor(Math.random() * names.length)]} ${surnames[Math.floor(Math.random() * surnames.length)]}`;
+        }
+        
+        function showNotification(message) {
+            elements.notification.textContent = message;
+            elements.notification.classList.add('show');
+            
+            setTimeout(() => {
+                elements.notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        function createConfetti() {
+            const colors = ['#FF5252', '#FFD700', '#1E90FF', '#4CAF50', '#FF8C00', '#8A2BE2'];
+            
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = `${Math.random() * 100}vw`;
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.width = `${Math.random() * 10 + 5}px`;
+                confetti.style.height = `${Math.random() * 10 + 5}px`;
+                confetti.style.animation = `confetti-fall ${Math.random() * 3 + 2}s linear forwards`;
+                
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+        
+        function claimDailyBonus() {
+            if (state.dailyBonusClaimed) return;
+            
+            state.stars += config.dailyBonus;
+            updateStars();
+            state.dailyBonusClaimed = true;
+            elements.dailyBonusBtn.disabled = true;
+            elements.dailyBonusBtn.textContent = 'Бонус получен';
+            
+            addWinner(`Игрок ${generateRandomName()}`, `Ежедневный бонус ${config.dailyBonus} звёзд`);
+            showNotification(`Вы получили ежедневный бонус ${config.dailyBonus} звёзд!`);
+            createConfetti();
+        }
+        
+        function generateReferralLink() {
+            const refId = `ref_${Math.random().toString(36).substr(2, 8)}`;
+            const refLink = `${window.location.href}?ref=${refId}`;
+            
+            elements.refLink.value = refLink;
+            elements.refLinkContainer.style.display = 'flex';
+            
+            showNotification('Реферальная ссылка создана!');
+        }
+        
+        function copyToClipboard() {
+            elements.refLink.select();
+            document.execCommand('copy');
+            
+            showNotification('Ссылка скопирована в буфер обмена!');
+        }
+        
+        function simulateRealTimeWinners() {
+            const prizes = [
+                '10 звёзд', '20 звёзд', '5 звёзд', '50 звёзд', 
+                'Премиум Telegram', '15 звёзд', '30 звёзд', '100 звёзд'
+            ];
+            
+            setInterval(() => {
+                if (Math.random() > 0.3) {
+                    const randomPrize = prizes[Math.floor(Math.random() * prizes.length)];
+                    addWinner(`Игрок ${generateRandomName()}`, randomPrize);
+                }
+            }, Math.random() * (config.maxSpinDelay - config.minSpinDelay) + config.minSpinDelay);
+        }
+        
+        function checkReferral() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const refId = urlParams.get('ref');
+            
+            if (refId) {
+                showNotification('Реферальная ссылка активирована!');
+            }
+        }
+        
+        function initApp() {
+            initWheel();
+            updateStars();
+            simulateRealTimeWinners();
+            checkReferral();
+            
+            for (let i = 0; i < 10; i++) {
+                const randomPrize = config.wheelItems[Math.floor(Math.random() * config.wheelItems.length)].text;
+                addWinner(`Игрок ${generateRandomName()}`, randomPrize);
+            }
+            
+            elements.spinBtn.addEventListener('click', spinWheel);
+            elements.subscribeCheck.addEventListener('change', function() {
+                elements.spinBtn.disabled = !this.checked;
+            });
+            
+            elements.dailyBonusBtn.addEventListener('click', claimDailyBonus);
+            elements.refBtn.addEventListener('click', generateReferralLink);
+            elements.copyBtn.addEventListener('click', copyToClipboard);
+        }
+        
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
